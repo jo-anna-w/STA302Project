@@ -1,0 +1,297 @@
+---
+title: "STA302_project"
+output: html_document
+date: "2026-10-29"
+---
+FOR INFLUENTIAL POINTS STUFF GO TO LINE 206
+```{r}
+data <- read.csv("nba_final.csv")
+#summary(data)
+data <- data[complete.cases(data[, c(8,9,10,21,26,27,28,29,30,31,32,33,34,45)]), ]
+dim(data)
+```
+
+```{r}
+data$Play <- as.factor(data$Play)
+model <- lm(data=data, Salary~G+GS+MP+FT+TRB+AST+STL+BLK+TOV+PF+PTS+
+              mean_views+Play+mean_views:Play)#chose mean_views:Play as interaction term because
+#it could be interesting to see if an increase in views on wikipedia has a different effect
+#on salary if the player has already been in an all star game
+e_hat<-resid(model)
+y_hat<-fitted(model)
+summary(model)
+```
+
+```{r, fig.width=14, fig.height=14}
+png("pairs_plot.png", width = 800, height = 800, res = 100)
+pairs(data[,c(8,9,10,21,26,27,28,29,30,31,32,34,45)])
+dev.off()
+```
+
+```{r}
+pairs(data[,c(8,9,10,21,26,27,28,29,30,31,32,34,45)])
+```
+
+```{r, echo=F, fig.width=8, fig.height=11}
+par(mfrow=c(4,3))
+plot(data$Salary ~ y_hat, ylab="Salary", xlab="Fitted")
+plot(e_hat ~ y_hat, ylab="Residuals", xlab="Fitted")
+```
+
+```{r, echo=F, fig.width=8, fig.height=11}
+par(mfrow = c(3, 3))
+
+for(i in c(8,9,10,21,26,27,28,29,30,31,32,34,45)){
+plot(e_hat ~ data[,i], ylab="Residuals", xlab=names(data)[i])
+}
+```
+
+```{r, echo=F, fig.width=8, fig.height=11}
+plot(e_hat, ylab="Residuals", xlab="Observation number")
+```
+
+```{r, echo=F, fig.width=3, fig.height=5}
+qqnorm(e_hat)
+qqline(e_hat)
+```
+
+
+```{r}
+hist(data$Salary)
+hist(data$Salary,
+     main = "Histogram of mean_views",
+     xlab = "mean_views",
+     ylab = "Frequency",
+     col = "lightblue",
+     breaks = 30)
+```
+
+
+
+```{r}
+#log transformation on the response might fix the issue since the response is right skewed
+lnSalary <- log(data$Salary)
+lnviews <- log(data$mean_views)
+#fit a new model with lnSalary
+model2 <- lm(data=data, lnSalary~G+GS+MP+FT+TRB+AST+STL+BLK+TOV+PF+PTS+
+              lnviews+Play+lnviews:Play)
+e_hat2<-resid(model2)
+y_hat2<-fitted(model2)
+```
+
+```{r}
+hist(lnSalary)
+hist(lnviews)
+```
+
+
+```{r, echo=F, fig.width=8, fig.height=11}
+par(mfrow=c(4,3))
+plot(lnSalary ~ y_hat2, ylab="lnSalary", xlab="Fitted")
+plot(e_hat2 ~ y_hat2, ylab="Residuals", xlab="Fitted")
+```
+
+
+
+```{r, fig.width=14, fig.height=14}
+png("pairs_plot2.png", width = 800, height = 800, res = 100)
+pairs(data[, c("G","GS","MP","FT","TRB","AST","STL","BLK","TOV","PF","PTS","lnviews")])
+dev.off()
+```
+
+
+```{r, echo=F, fig.width=8, fig.height=11}
+par(mfrow = c(3, 3))
+
+for(i in c("G","GS","MP","FT","TRB","AST","STL","BLK","TOV","PF","PTS","lnviews")){
+plot(e_hat2 ~ data[,i], ylab="Residuals", xlab= i)
+}
+```
+
+
+
+```{r}
+#apply box-cox on predictors(FT, TRB, AST, TOV, PTS) to fix the constant variance issues
+#install.packages("car")
+#library(car)
+#summary(powerTransform(cbind(data[,c('FT','TRB','AST','TOV', 'PTS')] + 1)))
+
+#apply transfromations on each variable based on results above
+data$bcFT <- (data$FT + 1)^(-1/2)
+data$bcAST <- (data$AST + 1)^(-1/3)
+data$bcTOV <- (data$TOV + 1)^(-1/3)
+data$bcPTS <- (data$PTS + 1)^(-1/3)
+```
+
+
+
+```{r}
+#fit a new model using transformed response and predictors
+model3 <- lm(lnSalary ~ G + GS + MP + bcFT + TRB + bcAST + STL + BLK + bcTOV + PF + bcPTS +
+              lnviews + Play + lnviews:Play, data=data)
+summary(model3)
+
+e_hat3 <- resid(model3)
+y_hat3 <- fitted(model3)
+```
+
+
+```{r, fig.width=14, fig.height=14}
+png("pairs_plot3.png", width = 800, height = 800, res = 100)
+pairs(data[, c("G","GS","MP","bcFT","TRB","bcAST","STL","BLK","bcTOV","PF","bcPTS","lnviews")])
+dev.off()
+```
+
+```{r, echo=F, fig.width=8, fig.height=11}
+par(mfrow=c(4,3))
+plot(data$lnSalary ~ y_hat3, ylab="lnSalary", xlab="Fitted")
+plot(e_hat3 ~ y_hat3, ylab="Residuals", xlab="Fitted")
+```
+
+
+```{r, echo=F, fig.width=8, fig.height=11}
+par(mfrow = c(3, 3))
+
+for(i in c("G","GS","MP","bcFT","TRB","bcAST","STL","BLK","bcTOV","PF","bcPTS","lnviews")){
+plot(e_hat3 ~ data[,i], ylab="Residuals", xlab= i)
+}
+```
+
+
+```{r, echo=F, fig.width=5, fig.height=5}
+qqnorm(e_hat3)
+qqline(e_hat3)
+```
+this QQ plot is still not very in line. What we think is causing this is the group of outliers that can be seen in almost all plots. Our model is giving higher salaries to 
+
+```{r}
+# fit a new model excluding the insignificant predictors
+reduced <- lm(lnSalary ~ G + MP + TRB + BLK + PF + bcPTS +
+              lnviews + Play + lnviews:Play, data=data)
+summary(reduced)
+
+anova(reduced, model3)
+```
+
+
+```{r}
+# fit a new model excluding the insignificant predictors
+reduced1 <- lm(lnSalary ~ G + MP + TRB + BLK  + lnviews + Play + lnviews:Play, data=data)
+summary(reduced1)
+
+anova(reduced1, reduced)
+```
+
+
+```{r}
+# fit a new model excluding the insignificant predictors
+reduced2 <- lm(lnSalary ~ G + MP + TRB + BLK, data=data)
+summary(reduced2)
+
+anova(reduced2, reduced1)
+```
+
+```{r}
+install.packages("car")
+library(car)
+vif(reduced1)
+```
+```{r}
+
+reduced4 <- lm(lnSalary ~ G + MP + TRB + BLK + lnviews + Play, data=data)
+summary(reduced4)
+vif(reduced4)
+```
+
+```{r}
+#follow format from worksheet 8
+n <- nrow(data)
+p <- length(coef(model3))-1
+
+# leverage cutoff
+hcut <- 2*(p+1)/n
+
+# cook's distance cutoff
+cookcut <- qf(0.5, p+1, n-p-1)
+
+# dffits cutoff
+fitcut <- 2*sqrt((p+1)/n)
+
+# dfbeta cutoff
+betacut <- 2/sqrt(n)
+```
+
+```{r}
+# leverage statistic
+h_ii <- hatvalues(model3)
+
+# standardized residuals
+r_i <- rstandard(model3)
+
+# cook's distance 
+D_i <- cooks.distance(model3)
+
+# dffits
+dffits_i <- dffits(model3)
+
+# dfbetas
+dfbetas_i <- dfbetas(model3)
+```
+
+```{r,eval=F}
+# which observations are leverage points?
+which(h_ii > hcut)
+
+# which observations are regression outliers?
+which(r_i > 4 | r_i < -4)
+
+# which observations are influential by cook's distance?
+which(D_i > cookcut)
+
+# which observations are influential by dffits?
+which(abs(dffits_i) > fitcut)
+
+# which observations are influential by dfbetas?
+for(i in 1:8){
+  print(paste0("Beta ", i-1))
+  print(which(abs(dfbetas_i[,i]) > betacut))    # this checks all betas in a loop
+}
+```
+```{r}
+# often repeated numbers in list above 440, 462, 488, 503, 578, 602, 610, 642, 678, 747, 748, 781, 790, 942, 1019, 1168, 1179, 1403
+#print a few for vibes
+print(data[440,])
+print(data[462,])
+print(data[747,])
+print(data[1168,])
+```
+
+```{r}
+#the ones above seem like they could be in the problematic group but not totally convinced, look at group as whole
+problem <- data[c(440, 462, 488, 503, 578, 602, 610, 642, 678, 747, 748, 781, 790, 942, 1019, 1168, 1179, 1403),]
+logsalary <- log(problem$Salary)
+print(logsalary)
+print(problem)
+```
+```{r}
+#PROBLEMS: THESE SALARYS ARE TOO HIGH AND TOO MANY OF THESE DUDES ARE PLAYING TOO MUCH
+#ones above are problematic points but not in the group of focues, more like singular outliers/leverage points which we can't do anything about
+#find the players with low salary and low games started because that is the main attribute of people in the problematic group
+which(lnSalary<12 & data$GS<15)
+```
+```{r}
+#all numbers above appear in the list of all influential points so going to use them to diagnose the problematic group
+moreproblems <- data[c(398,405,417,437,452,472,477,496,517,555,563,564,594,608,620,635,657,662,691,743,779,820,826,850,880,891,923,924,1009,1018,1052,1159,1177,1196,1215), ]
+print(moreproblems)
+```
+This list contains many players who were very young in the nba when this data was collected, played for a few years in the nba, didn't get too much playing time but did make contributions. The model takes these contributions and assumes a higher salary but they were getting paid bottom of the barrel.
+
+
+
+
+
+
+
+
+
+

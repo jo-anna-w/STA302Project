@@ -1,0 +1,121 @@
+---
+title: "STA302_project - FINAL model"
+output: html_document
+date: "2026-10-29"
+---
+
+```{r}
+data <- read.csv("NBA_final (1).csv")
+#summary(data)
+data$Play <- as.factor(data$Play)
+data <- data[complete.cases(data[, c(8,9,10,21,26,27,28,29,30,31,32,33,34,45)]), ]
+dim(data)
+```
+
+
+
+
+```{r}
+#log transformation on the response cause the data is right skewed
+data$lnSalary <- log(data$Salary)
+```
+
+
+
+
+```{R}
+#This model is chosen based on VIFs and stepwise selection.
+final_model <- lm(lnSalary ~ G + GS + PTS + TRB + TOV + BLK + 
+    mean_views + Play + mean_views:Play, data = data)
+
+summary(final_model)
+e_hatf <- resid(final_model)
+y_hatf <- fitted(final_model)
+
+
+
+```
+```{r, echo=F, fig.width=8, fig.height=11}
+par(mfrow=c(4,3))
+plot(data$lnSalary ~ y_hatf, ylab="lnSalary", xlab="Fitted")
+plot(e_hatf ~ y_hatf, ylab="Residuals", xlab="Fitted")
+```
+
+
+```{r, fig.width=14, fig.height=14}
+png("pairs_plot.png", width = 800, height = 800, res = 100)
+pairs(data[, c("G","GS","TRB","AST","BLK","PTS","mean_views")])
+dev.off()
+```
+
+
+```{r, echo=F, fig.width=8, fig.height=11}
+par(mfrow = c(4, 3))
+
+for(i in c("G","GS","TRB","TOV","BLK","PTS","mean_views")){
+plot(e_hatf ~ data[,i], ylab="Residuals", xlab= i)
+}
+```
+
+```{r}
+#apply box-cox on predictors(TRB, AST, BLK, PTS, mean_views) to fix the constant variance issues
+#install.packages("car")
+#library(car)
+#summary(powerTransform(cbind(data[,c('TRB','TOV','BLK', 'PTS', 'mean_views')] + 1)))
+
+#apply transfromations on each variable based on results above
+data$bcTRB <- bcPower(data$TRB + 1, 0) #log
+data$bcTOV <- bcPower(data$TOV + 1, -1/2)
+data$bcBLK <- bcPower(data$BLK + 1, -2) 
+data$bcPTS <- bcPower(data$PTS + 1, 0) 
+data$bcViews <- bcPower(data$mean_views, 0)
+```
+
+
+```{R}
+#FINAL MODEL WITH TRANSFORMED PREDICTORS
+final_model2 <- lm(lnSalary ~ G + GS + bcPTS + bcTRB + bcTOV + bcBLK + 
+                      bcViews + Play + bcViews:Play, data = data)
+
+summary(final_model2)
+e_hatf2 <- resid(final_model2)
+y_hatf2 <- fitted(final_model2)
+
+extractAIC(final_model2, k=2)[2]
+
+vif(final_model2)
+```
+
+```{r, echo=F, fig.width=8, fig.height=11}
+par(mfrow=c(4,3))
+plot(data$lnSalary ~ y_hatf, ylab="lnSalary", xlab="Fitted")
+plot(e_hatf ~ y_hatf, ylab="Residuals", xlab="Fitted")
+```
+
+
+```{r, fig.width=14, fig.height=14}
+png("pairs_plot.png", width = 800, height = 800, res = 100)
+pairs(data[, c("G","GS","bcTRB","bcTOV","bcBLK","bcPTS","bcViews")])
+dev.off()
+```
+
+
+```{r, echo=F, fig.width=8, fig.height=11}
+par(mfrow = c(4, 3))
+
+for(i in c("G","GS","bcTRB","bcTOV","bcBLK","bcPTS","bcViews")){
+plot(e_hatf ~ data[,i], ylab="Residuals", xlab= i)
+}
+```
+
+```{r, echo=F, fig.width=3, fig.height=5}
+qqnorm(e_hatf2)
+qqline(e_hatf2)
+```
+
+
+```{r}
+#checking if the reduced model is better
+
+
+```
